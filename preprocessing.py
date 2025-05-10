@@ -42,27 +42,34 @@ def process_record(record_id, data_dir='.', output_dir='processed_data', fs=250,
         end = start + samples_per_segment
         segment = signal[start:end, :]
 
-        # Get annotation(s) in this segment
+        # Clean and get aux labels in the segment
         labels_in_segment = [
-            aux_notes[j]
+            aux_notes[j].strip().upper()
             for j in range(len(sample_indices))
-            if start <= sample_indices[j] < end and aux_notes[j] != ''
+            if start <= sample_indices[j] < end and aux_notes[j].strip() != ''
         ]
 
         if labels_in_segment:
-            label = labels_in_segment[0]  # Or: most common label
-            last_label = label
+            last_label = labels_in_segment[0]
+            current_label = last_label
         elif last_label is not None:
-            label = last_label
+            current_label = last_label
         else:
-            label = 'UNKNOWN'
+            current_label = 'UNKNOWN'
+
+        # Binary classification: 1 if it's a ventricular arrhythmia
+        if any(tag in current_label for tag in ['VT', 'VF', 'VFIB']):
+            label = 1
+        else:
+            label = 0
 
         segments.append(segment)
         labels.append(label)
 
     # Convert to arrays
     segments = np.array(segments)               # shape: (N, 2000, 2)
-    labels = np.array(labels, dtype=object)     # shape: (N,), string labels
+    labels = np.array(labels, dtype=np.int32)     # shape: (N,), integer labels
+
 
     # Make sure output folder exists
     os.makedirs(output_dir, exist_ok=True)
